@@ -1,0 +1,5 @@
+{
+  "name": "File Comparator",
+  "description": "Compare two Excel or CSV files and highlight differences between a main file and a reference file.",
+  "requestFramePermissions": []
+}
