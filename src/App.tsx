@@ -5,6 +5,7 @@ import { parseFile, compareFilesAsync, generateTextReport, FileData, ComparisonR
 import { FileSearch, RefreshCw, Download, Info, AlertTriangle, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export default function App() {
   const [mainFile, setMainFile] = useState<File | null>(null);
@@ -76,27 +77,100 @@ export default function App() {
     ? mainData.headers.filter(h => refData.headers.includes(h))
     : [];
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!result) return;
 
-    const exportData = result.rows.map((row, i) => {
-      const exportRow: any = { 
-        '#': i + 1,
-        'STATUS': row.status === 'not_found_in_reference' ? 'NOT FOUND' : 'MATCHED'
-      };
-      result.headers.forEach((header, colIndex) => {
-        exportRow[header] = row.data[colIndex];
-        if (row.mismatches[colIndex] && row.status === 'matched') {
-          exportRow[`${header}_REF`] = row.referenceData?.[colIndex];
-        }
-      });
-      return exportRow;
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Comparison Results');
+
+    // Define columns
+    const columns = [
+      { header: '#', key: 'index', width: 10 },
+      { header: 'STATUS', key: 'status', width: 15 },
+      ...result.headers.map(header => ({
+        header: header,
+        key: header,
+        width: 20
+      }))
+    ];
+
+    // Add reference columns for mismatches
+    result.headers.forEach(header => {
+      const hasMismatch = result.rows.some(row => 
+        row.status === 'matched' && 
+        row.mismatches[result.headers.indexOf(header)]
+      );
+      if (hasMismatch) {
+        columns.push({
+          header: `${header}_REF`,
+          key: `${header}_REF`,
+          width: 20
+        });
+      }
     });
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Comparison Results");
-    XLSX.writeFile(wb, "comparison_results.xlsx");
+    worksheet.columns = columns;
+
+    // Style header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE2E8F0' } // slate-200
+    };
+
+    // Add data rows
+    result.rows.forEach((row, i) => {
+      const rowData: any = {
+        index: i + 1,
+        status: row.status === 'not_found_in_reference' ? 'NOT FOUND' : 'MATCHED'
+      };
+
+      result.headers.forEach((header, colIndex) => {
+        rowData[header] = row.data[colIndex];
+        if (row.mismatches[colIndex] && row.status === 'matched') {
+          rowData[`${header}_REF`] = row.referenceData?.[colIndex];
+        }
+      });
+
+      const excelRow = worksheet.addRow(rowData);
+
+      // Apply styling for mismatches
+      if (row.status === 'matched') {
+        result.headers.forEach((header, colIndex) => {
+          if (row.mismatches[colIndex]) {
+            // Find the cell for this header
+            // Columns are 1-indexed: index(1), status(2), headers(3...)
+            const cell = excelRow.getCell(colIndex + 3);
+            cell.font = { color: { argb: 'FFFF0000' }, bold: true }; // Red color
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFEBEE' } // Very light red background
+            };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFFF0000' } },
+              left: { style: 'thin', color: { argb: 'FFFF0000' } },
+              bottom: { style: 'thin', color: { argb: 'FFFF0000' } },
+              right: { style: 'thin', color: { argb: 'FFFF0000' } }
+            };
+          }
+        });
+      } else if (row.status === 'not_found_in_reference') {
+        excelRow.getCell(2).font = { color: { argb: 'FFD97706' }, bold: true }; // Amber color for status
+      }
+    });
+
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'comparison_results_highlighted.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleExportText = () => {
