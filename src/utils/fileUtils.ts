@@ -210,9 +210,9 @@ export const generateTextReport = (
   result: ComparisonResult,
   keyColumnNames: string[]
 ): string => {
-  let report = `AI ANALYSIS REPORT\n`;
+  let report = `${reference.fileName}\n`;
   report += `==================\n\n`;
-  report += `1. total records from both file: main: ${main.rows.length}        reference: ${reference.rows.length}\n\n`;
+  report += `1. total records from both file: Akhilesh file: ${main.rows.length}        Ankith file: ${reference.rows.length}\n\n`;
 
   const columnMismatches = result.headers.map((header, colIndex) => {
     const count = result.rows.reduce((acc, row) => 
@@ -236,7 +236,7 @@ export const generateTextReport = (
         const mainVal = firstErrorRow.data[cm.colIndex];
         const refVal = firstErrorRow.referenceData?.[cm.colIndex];
         
-        report += `\nmiss matched value from the ${cm.header} column is main: ${mainVal}   reference: ${refVal}\n`;
+        report += `\nmiss matched value from the ${cm.header} column is Akhilesh file: ${mainVal}   Ankith file: ${refVal}\n`;
         
         // Add primary keys
         if (keyColumnNames.length > 0) {

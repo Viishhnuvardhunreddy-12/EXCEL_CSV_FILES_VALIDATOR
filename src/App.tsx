@@ -91,7 +91,8 @@ export default function App() {
         header: header,
         key: header,
         width: 20
-      }))
+      })),
+      { header: '', key: 'spacer', width: 5 } // Spacer column
     ];
 
     // Add reference columns for mismatches
@@ -102,8 +103,8 @@ export default function App() {
       );
       if (hasMismatch) {
         columns.push({
-          header: `${header}_REF`,
-          key: `${header}_REF`,
+          header: `${header}_ANKITH`,
+          key: `${header}_ANKITH`,
           width: 20
         });
       }
@@ -111,37 +112,82 @@ export default function App() {
 
     worksheet.columns = columns;
 
+    // Identify column indices
+    const mainColStart = 3;
+    const mainColEnd = 3 + result.headers.length - 1;
+    const spacerColIdx = mainColEnd + 1;
+    const ankithColStart = spacerColIdx + 1;
+
     // Style header row
     const headerRow = worksheet.getRow(1);
     headerRow.font = { bold: true };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE2E8F0' } // slate-200
-    };
+    
+    // Apply column-specific header styles
+    headerRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+    headerRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+    
+    for (let i = mainColStart; i <= mainColEnd; i++) {
+      headerRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; // Light blue header
+    }
+    
+    headerRow.getCell(spacerColIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } }; // Dark divider
+    
+    for (let i = ankithColStart; i <= columns.length; i++) {
+      headerRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // Light green header
+    }
+
+    // Apply borders to header row
+    headerRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } }, // slate-400
+        left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+      };
+    });
 
     // Add data rows
     result.rows.forEach((row, i) => {
       const rowData: any = {
         index: i + 1,
-        status: row.status === 'not_found_in_reference' ? 'NOT FOUND' : 'MATCHED'
+        status: row.status === 'not_found_in_reference' ? 'NOT FOUND' : 'MATCHED',
+        spacer: ''
       };
 
       result.headers.forEach((header, colIndex) => {
         rowData[header] = row.data[colIndex];
         if (row.mismatches[colIndex] && row.status === 'matched') {
-          rowData[`${header}_REF`] = row.referenceData?.[colIndex];
+          rowData[`${header}_ANKITH`] = row.referenceData?.[colIndex];
         }
       });
 
       const excelRow = worksheet.addRow(rowData);
 
-      // Apply styling for mismatches
+      // Apply borders to all cells in the row
+      excelRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFCBD5E1' } }, // slate-300
+          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+        };
+      });
+
+      // Apply column background colors for the data row
+      for (let j = mainColStart; j <= mainColEnd; j++) {
+        excelRow.getCell(j).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F9FF' } }; // Very light blue
+      }
+      
+      excelRow.getCell(spacerColIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } }; // Dark spacer
+      
+      for (let j = ankithColStart; j <= columns.length; j++) {
+        excelRow.getCell(j).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7FEE7' } }; // Very light green
+      }
+
+      // Apply styling for mismatches (overrides background if mismatch)
       if (row.status === 'matched') {
         result.headers.forEach((header, colIndex) => {
           if (row.mismatches[colIndex]) {
-            // Find the cell for this header
-            // Columns are 1-indexed: index(1), status(2), headers(3...)
             const cell = excelRow.getCell(colIndex + 3);
             cell.font = { color: { argb: 'FFFF0000' }, bold: true }; // Red color
             cell.fill = {
